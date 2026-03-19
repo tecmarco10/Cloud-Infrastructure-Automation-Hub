@@ -12,7 +12,21 @@ def get_now_wib():
 # ==========================================
 # 🎯 MENGAMBIL PARAMETER DARI GITHUB ACTIONS
 # ==========================================
-ACTION_TYPE = os.environ.get("ACTION_TYPE", "").strip().upper()
+RAW_ACTION = os.environ.get("ACTION_TYPE", "").strip().upper()
+
+# PERBAIKAN: Normalisasi ACTION_TYPE agar tahan banting dari typo atau format berbeda
+# Jika dari YML terkirim "FOLLOWERS" atau "/FOLLOW", akan diseragamkan jadi "FOLLOW"
+if "FOLLOW" in RAW_ACTION:
+    ACTION_TYPE = "FOLLOW"
+elif "STAR" in RAW_ACTION:
+    ACTION_TYPE = "STARS"
+elif "FORK" in RAW_ACTION:
+    ACTION_TYPE = "FORKS"
+elif "WATCH" in RAW_ACTION:
+    ACTION_TYPE = "WATCH"
+else:
+    ACTION_TYPE = RAW_ACTION
+
 if not ACTION_TYPE:
     print("❌ CRITICAL ERROR: Sinyal 'ACTION_TYPE' tidak ditemukan di file .yml!")
     sys.exit(1)
@@ -44,7 +58,8 @@ UI = {
         "success": "DEPLOYMENT BERHASIL",
         "time": "Waktu",
         "accomplished": "MISI SELESAI",
-        "awake": "PEKERJA CLOUD AKTIF"
+        "awake": "PEKERJA CLOUD AKTIF",
+        "token": "Token"
     },
     "en": {
         "live": "LIVE EXECUTION",
@@ -59,7 +74,8 @@ UI = {
         "success": "DEPLOYMENT SUCCESS",
         "time": "Time",
         "accomplished": "MISSION ACCOMPLISHED",
-        "awake": "CLOUD WORKER AWAKE"
+        "awake": "CLOUD WORKER AWAKE",
+        "token": "Token"
     }
 }
 T = UI.get(LANG, UI["id"])
@@ -67,11 +83,12 @@ T = UI.get(LANG, UI["id"])
 # ==========================================
 # 🎯 MENYIAPKAN TARGET & KUOTA
 # ==========================================
+# PERBAIKAN: Menambahkan fallback os.environ jaga-jaga kalau target ditaruh di TARGET_REPOS
 if ACTION_TYPE == "FOLLOW":
-    RAW_TARGETS = os.environ.get("TARGET_USERS", "")
+    RAW_TARGETS = os.environ.get("TARGET_USERS", "") or os.environ.get("TARGET_REPOS", "")
     TARGET_LABEL = T["target_user"]
 else:
-    RAW_TARGETS = os.environ.get("TARGET_REPOS", "")
+    RAW_TARGETS = os.environ.get("TARGET_REPOS", "") or os.environ.get("TARGET_USERS", "")
     TARGET_LABEL = T["target_repo"]
 
 TARGETS = [t.strip() for t in RAW_TARGETS.split(",") if t.strip()]
@@ -188,7 +205,8 @@ def main():
                f"🎯 <b>Target:</b> <a href='https://github.com/{selected_target}'>{selected_target}</a>\n"
                f"🤖 <b>Workers:</b> {worker_info}\n"
                f"⏳ <b>Pacing:</b> {INPUT_DUR} Hours\n\n"
-               f"🛡️ <i>Engineered by Abie Haryatmo</i>")
+               f"🛡️ <i>Engineered by Abie Haryatmo</i>\n"
+               f"🤝 <b>Powered by XianBee Tech Store</b>")
     send_telegram_notification(pre_msg)
 
     success_count = 0
@@ -204,10 +222,12 @@ def main():
                     f"🔄 <i>{T['deploying']}</i>\n"
                     f"══════════════════════\n"
                     f"🎯 <b>{TARGET_LABEL} :</b> <a href='https://github.com/{selected_target}'>{selected_target}</a>\n"
-                    f"🤖 <b>{T['node']}   :</b> #{real_idx + 1} ({token_preview})\n"
+                    f"🤖 <b>{T['node']}   :</b> #{real_idx + 1}\n"
+                    f"🔑 <b>{T['token']}  :</b> <code>{token_preview}</code>\n"
                     f"📊 <b>{T['progress']} :</b> <code>[{bar}] {progress_pct}%</code>\n"
                     f"🔢 <b>Status :</b> {T['status'].format(current=step_i, total=len(tokens_to_use))}\n\n"
-                    f"🛡️ <i>Engineered by Abie Haryatmo</i>")
+                    f"🛡️ <i>Engineered by Abie Haryatmo</i>\n"
+                    f"🤝 <b>Powered by XianBee Tech Store</b>")
         
         sent_msgs = send_telegram_notification(msg_live)
 
@@ -231,10 +251,13 @@ def main():
                     f"══════════════════════\n"
                     f"🎯 <b>{TARGET_LABEL} :</b> <a href='https://github.com/{selected_target}'>{selected_target}</a>\n"
                     f"🤖 <b>{T['node']}   :</b> #{real_idx + 1}\n"
+                    f"🔑 <b>{T['token']}  :</b> <code>{token_preview}</code>\n"
                     f"📊 <b>{T['progress']} :</b> <code>[{final_bar}] {final_pct}%</code>\n"
                     f"⏱️ <b>{T['time']}   :</b> {get_now_wib().strftime('%H:%M:%S WIB')}\n\n"
                     f"#CloudAutomation\n"
-                    f"<i>{selected_quote}</i>")
+                    f"<i>{selected_quote}</i>\n\n"
+                    f"🛡️ <i>Engineered by Abie Haryatmo</i>\n"
+                    f"🤝 <b>Powered by XianBee Tech Store</b>")
         
         edit_telegram_notification(sent_msgs, msg_done)
 
@@ -249,7 +272,8 @@ def main():
                     f"<b>Action:</b> {ACTION_TYPE} INJECTION\n"
                     f"<b>Target:</b> <a href='https://github.com/{selected_target}'>{selected_target}</a>\n"
                     f"<b>Result:</b> {success_count}/{len(tokens_to_use)} Success\n\n"
-                    f"🛡️ <i>Engineered by Abie Haryatmo</i>")
+                    f"🛡️ <i>Engineered by Abie Haryatmo</i>\n"
+                    f"🤝 <b>Powered by XianBee Tech Store</b>")
     send_telegram_notification(final_report)
     print("="*50)
     print("✅ EXECUTION COMPLETE!")

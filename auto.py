@@ -60,19 +60,20 @@ MSG_INIT_TXT = "Establishing secure uplink..."
 MSG_LIVE_TXT = "Deploying payload to target..."
 MSG_SYNC_TXT = "Checksum verified. Sync complete."
 MSG_END_TXT  = "Operation concluded. Wiping logs..."
-VAL_SKIP = "ALREADY INJECTED"
 
 L_TOP = "╔═════════════════════════╗"
 L_MID = "╠═════════════════════════╣"
 L_BOT = "╚═════════════════════════╝"
 
+# ==========================================
+# 📡 TELEGRAM NOTIFICATION SYSTEM
+# ==========================================
 def send_telegram_notification(message, skip_group=False):
     bot_token = os.environ.get("TELEGRAM_BOT_TOKEN", "").strip()
     chat_ids_raw = os.environ.get("TELEGRAM_CHAT_ID", "").strip()
     group_ids_raw = os.environ.get("TELEGRAM_GROUP_ID", "").strip()
 
     if not bot_token or not chat_ids_raw:
-        print("❌ ERROR: TELEGRAM_BOT_TOKEN atau TELEGRAM_CHAT_ID kosong/tidak terbaca dari Secrets!")
         return {}
 
     chat_ids = [chat_id.strip() for chat_id in chat_ids_raw.split(",") if chat_id.strip()]
@@ -123,6 +124,9 @@ def send_telegram_static_only(message):
         try: requests.post(url, json=payload, timeout=15)
         except: pass
 
+# ==========================================
+# 🚀 GITHUB INJECTION API
+# ==========================================
 def perform_api_action(token, target, action_type):
     headers = {"Authorization": f"Bearer {token}", "Accept": "application/vnd.github.v3+json", "X-GitHub-Api-Version": "2022-11-28"}
     try:
@@ -169,16 +173,14 @@ def perform_api_action(token, target, action_type):
 # ====================================================
 # 🦅 JURUS PHOENIX PROTOCOL (REINKARNASI OTOMATIS)
 # ====================================================
-def reinkarnasi_otomatis(sisa_qty, next_start):
-    # WAJIB: Pastikan lu nyimpen Token PAT Admin lu di GitHub Secrets sebagai 'REPO_PAT'
+def reinkarnasi_otomatis(sisa_qty, next_start, max_hours):
     token = os.environ.get("REPO_PAT", "").strip() 
     repo = os.environ.get("GITHUB_REPOSITORY", "").strip()
 
     if not token or not repo:
-        print("❌ [PHOENIX] Gagal Reinkarnasi: REPO_PAT tidak terbaca. Pastikan lu nambahin ENV REPO_PAT di file .yml lu!")
+        print("❌ [PHOENIX] Gagal Reinkarnasi: REPO_PAT tidak terbaca!")
         return
 
-    # Map nama file YML berdasarkan ACTION_TYPE
     if ACTION_TYPE == "FOLLOW": wf_file = "auto_follow.yml"
     elif ACTION_TYPE == "STARS": wf_file = "auto_star.yml"
     elif ACTION_TYPE == "FORKS": wf_file = "auto_fork.yml"
@@ -186,6 +188,9 @@ def reinkarnasi_otomatis(sisa_qty, next_start):
     elif ACTION_TYPE == "TRAFFIC": wf_file = "auto_traffic.yml"
     elif ACTION_TYPE == "NPM": wf_file = "auto_npm.yml"
     else: wf_file = "auto_follow.yml"
+
+    # Potong durasi sisa supaya pacing-nya tetap akurat
+    sisa_durasi = max(0.5, INPUT_DUR - max_hours)
 
     url = f"https://api.github.com/repos/{repo}/actions/workflows/{wf_file}/dispatches"
     headers = {
@@ -197,9 +202,9 @@ def reinkarnasi_otomatis(sisa_qty, next_start):
         "inputs": {
             "target": RAW_TARGETS,
             "quantity": str(sisa_qty),
-            "duration": str(INPUT_DUR),
+            "duration": str(round(sisa_durasi, 2)),
             "start_index": str(next_start),
-            "engine_name": ENGINE_NAME,
+            "engine_name": f"{ENGINE_NAME} (Relay)",
             "lang": "en",
             "buyer_id": os.environ.get("BUYER_ID", "")
         }
@@ -207,13 +212,31 @@ def reinkarnasi_otomatis(sisa_qty, next_start):
     
     res = requests.post(url, headers=headers, json=payload)
     if res.status_code == 204:
-        print(f"✅ [PHOENIX PROTOCOL] Reinkarnasi Sisa {sisa_qty} Units BERHASIL ditembakkan!")
+        print(f"✅ [PHOENIX PROTOCOL] Reinkarnasi Sisa {sisa_qty} Units BERHASIL!")
+        
+        # Kirim Notifikasi Estetik Pergantian Engine
+        phoenix_msg = (
+            f"╭━━━━━━━━━━━━━━━━━━━━━━━━━╮\n"
+            f"   🔄 <b>P H O E N I X  P R O T O C O L</b>\n"
+            f"╰━━━━━━━━━━━━━━━━━━━━━━━━━╯\n"
+            f"🔸 <code>Engine   :</code> {ENGINE_NAME}\n"
+            f"🔸 <code>Target   :</code> <code>{TARGETS[0]}</code>\n"
+            f"🔸 <code>Status   :</code> Time Limit Reached ({max_hours} Hrs)\n"
+            f"🔸 <code>Action   :</code> Handover to new relay node\n"
+            f"🔸 <code>Rem. QTY :</code> {sisa_qty} Units\n"
+            f"━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+            f"⚡ <i>Spawning new worker node to continue operations...</i>"
+        )
+        send_telegram_notification(phoenix_msg, skip_group=False)
     else:
         print(f"❌ [PHOENIX PROTOCOL] Gagal menembak reinkarnasi: {res.text}")
 
+# ==========================================
+# 🛠️ MAIN EXECUTION BLOCK
+# ==========================================
 def main():
-    START_TIME = time.time() # ⏳ MULAILAH ARGO WAKTU DISINI
-    MAX_HOURS = 5.0 # ⏳ BATAS AMAN GITHUB ACTIONS: 5 JAM MAX
+    START_TIME = time.time()
+    MAX_HOURS = 5.0 # BATAS AMAN: 5 JAM MAX SEBELUM REINKARNASI
 
     print("Mempersiapkan token pekerja...")
     tokens_raw = os.environ.get("WORKER_TOKENS", "")
@@ -243,7 +266,7 @@ def main():
     else:
         worker_info = f"{len(tokens_to_use)} Nodes ({','.join(idx_list)})"
 
-    print(f"📊 Menjalankan {len(tokens_to_use)} antrean dengan base delay {base_delay} detik.")
+    print(f"📊 Menjalankan {len(tokens_to_use)} antrean dengan base delay {base_delay:.2f} detik.")
 
     bar_init = "░" * 10
     success_count = 0
@@ -387,21 +410,7 @@ def main():
             if sisa_qty > 0:
                 next_start = real_idx + 2
                 print(f"⏰ LIMIT 5 JAM TERCAPAI! Mengevakuasi {sisa_qty} orderan tersisa...")
-                
-                phoenix_msg = (
-                    f"╭━━━━━━━━━━━━━━━━━━━━━━━━━╮\n"
-                    f"   🔄 <b>P H O E N I X  P R O T O C O L</b>\n"
-                    f"╰━━━━━━━━━━━━━━━━━━━━━━━━━╯\n"
-                    f"🔸 <code>Engine   :</code> {ENGINE_NAME}\n"
-                    f"🔸 <code>Target   :</code> <code>{selected_target}</code>\n"
-                    f"🔸 <code>Status   :</code> Time Limit Reached (5 Hrs)\n"
-                    f"🔸 <code>Action   :</code> Auto-Reincarnation Triggered\n"
-                    f"🔸 <code>Rem. QTY :</code> {sisa_qty} Units\n"
-                    f"━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-                    f"<i>Spawning new worker node to complete order...</i>"
-                )
-                send_telegram_notification(phoenix_msg, skip_group=False)
-                reinkarnasi_otomatis(sisa_qty, next_start)
+                reinkarnasi_otomatis(sisa_qty, next_start, MAX_HOURS)
                 sys.exit(0) # Keluar dengan aman sebelum ditembak mati oleh GitHub
 
         if step_i < len(tokens_to_use) - 1:
